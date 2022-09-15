@@ -1,0 +1,16 @@
+.pytest_cache
+data
+lightning_logs
+old_nbs
+saved_models
+flickr_backup.ipynb
+inductive_datamodule_backup.py
+lightning-test.py
+reddit2_backup.ipynb
+saint.py
+saint_lightning.py
+scratch
+test.ipynb
+train_test_model.py
+experiments/*
+.idea/*
