@@ -41,7 +41,7 @@ class ProbabilityAccumulator:
         prob = np.array([self.prob_sort[i, ranks[i]] for i in range(n2)])
         alpha_max = 1.0 - prob_cum
         if epsilon is not None:
-            alpha_max += np.multiply(prob, epsilon)
+            alpha_max += np.multiply(prob, epsilon)  # Uniform sampling step.
         else:
             alpha_max += prob
         alpha_max = np.minimum(alpha_max, 1)

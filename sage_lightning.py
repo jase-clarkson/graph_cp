@@ -9,7 +9,11 @@ from torch.nn import BatchNorm1d
 from torchmetrics import Accuracy
 
 from torch_geometric import seed_everything
-from torch_geometric.datasets import Flickr, Reddit2
+from torch_geometric.datasets import Flickr, Reddit2, Amazon
+from torch_geometric.datasets import Coauthor, CitationFull
+
+from torch_geometric.transforms import NormalizeFeatures, RandomNodeSplit
+
 from torch_geometric.nn import GraphSAGE
 from inductive_datamodule import InductiveNodeLoader
 import pickle as pkl
@@ -67,14 +71,26 @@ class Model(pl.LightningModule):
 def main():
     seed_everything(42)
 
-    dataset = 'Flickr'
+    dataset = 'Computers'
     time = datetime.now().strftime('%d-%m-%Y_%H-%M-%S')
     fstr = time + '_' + dataset
     exp_path = os.path.join('experiments', fstr)
     os.mkdir(exp_path)
 
     data_path = os.path.join('data', dataset)
-    dataset = eval(dataset)(data_path)
+    if dataset == 'Physics':
+        dataset = Coauthor('data/', 'CS',
+                        pre_transform=RandomNodeSplit(split='train_rest', num_val=1000, num_test=15000),
+                        transform=NormalizeFeatures())
+    elif dataset == 'DBLP':
+        dataset = CitationFull('data/', 'DBLP' ,
+                               pre_transform=RandomNodeSplit(split='train_rest', num_val=1000, num_test=12000))
+
+    elif dataset == 'Computers':
+        dataset = Amazon('data/', 'Computers',
+                         pre_transform=RandomNodeSplit(split='train_rest', num_val=1000, num_test=12000))
+    else:
+        dataset = eval(dataset)(data_path)
     # dataset = Reddit2('data/Reddit2')
     data = dataset[0]
     datamodule = InductiveNodeLoader(data,
@@ -84,7 +100,7 @@ def main():
 
     model = Model(dataset.num_node_features,
                   dataset.num_classes,
-                  aggr='max')
+                  aggr='mean')
 
     devices = torch.cuda.device_count()
     checkpoint = pl.callbacks.ModelCheckpoint(dirpath=exp_path,

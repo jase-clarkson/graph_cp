@@ -1,8 +1,13 @@
 import numpy as np
 from prob_accum import ProbabilityAccumulator
 from scipy.stats.mstats import mquantiles
+from scipy.optimize import brentq
 from coverage import wsc_unbiased
 
+def get_weighted_quantile(scores, weights, alpha):
+    wtildes = weights / (weights.sum() + 1)
+    def critical_point_quantile(q): return (wtildes * (scores <= q)).sum() - (1 - alpha)
+    return brentq(critical_point_quantile, 0, 100)
 
 def calibrate(probs, labels, alpha):
     n = probs.shape[0]
@@ -14,6 +19,7 @@ def calibrate(probs, labels, alpha):
     alpha_max = calibrator.calibrate_scores(labels, eps)
     scores = alpha - alpha_max
     level_adjusted = (1.0-alpha)*(1.0+1.0/float(n))
+
     alpha_correction = mquantiles(scores, prob=level_adjusted)
     return alpha - alpha_correction
 

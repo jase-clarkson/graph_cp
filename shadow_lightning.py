@@ -9,8 +9,9 @@ from torch.nn import BatchNorm1d
 from torchmetrics import Accuracy
 
 from torch_geometric import seed_everything
-from torch_geometric.datasets import Flickr, Reddit2
+from torch_geometric.datasets import Flickr, Reddit2, CitationFull, Amazon
 from torch_geometric.nn import GraphSAGE, GCN
+from torch_geometric.transforms import RandomNodeSplit
 from inductive_datamodule import InductiveShadowLoader
 import pickle as pkl
 
@@ -82,14 +83,22 @@ class Model(pl.LightningModule):
 def main():
     seed_everything(42)
 
-    dataset = 'Flickr'
+    dataset = 'Computers'
     time = datetime.now().strftime('%d-%m-%Y_%H-%M-%S')
     fstr = time + '_' + dataset + '_SHADOW'
     exp_path = os.path.join('experiments', fstr)
     os.mkdir(exp_path)
 
     data_path = os.path.join('data', dataset)
-    dataset = eval(dataset)(data_path)
+    if dataset == 'DBLP':
+        dataset = CitationFull('data/', 'DBLP' ,
+                               pre_transform=RandomNodeSplit(split='train_rest', num_val=1000, num_test=12000))
+    elif dataset == 'Computers':
+        dataset = Amazon('data/', 'Computers',
+                         pre_transform=RandomNodeSplit(split='train_rest', num_val=1000, num_test=12000))
+
+    else:
+        dataset = eval(dataset)(data_path)
     # dataset = Reddit2('data/Reddit2')
     data = dataset[0]
     datamodule = InductiveShadowLoader(data,
