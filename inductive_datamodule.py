@@ -3,6 +3,44 @@ from torch_geometric.loader import NeighborLoader
 from torch_geometric.loader import ShaDowKHopSampler
 
 
+class MultiGraphNodeLoader(LightningDataModule):
+    def __init__(self, train, val, test, num_neighbours, batch_size, num_workers):
+        super().__init__()
+        self.tr_data = train
+        self.val_data = val
+        self.test_data = test
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+        self.num_neightbours = num_neighbours
+
+    def train_dataloader(self):
+        return NeighborLoader(data=self.tr_data,
+                              num_neighbors=self.num_neightbours,
+                              batch_size=self.batch_size,
+                              shuffle=True,
+                              num_workers=self.num_workers)
+
+    def val_dataloader(self):
+        return NeighborLoader(data=self.val_data,
+                              num_neighbors=self.num_neightbours,
+                              batch_size=self.batch_size,
+                              shuffle=False,
+                              num_workers=self.num_workers)
+
+    def test_dataloader(self):
+        return NeighborLoader(data=self.test_data,
+                              num_neighbors=self.num_neightbours,
+                              batch_size=self.batch_size,
+                              shuffle=False,
+                              num_workers=self.num_workers)
+
+    def predict_dataloader(self):
+        return NeighborLoader(data=self.test_data,
+                              num_neighbors=self.num_neightbours,
+                              batch_size=self.batch_size,
+                              shuffle=False,
+                              num_workers=self.num_workers)
+
 class InductiveNodeLoader(LightningDataModule):
     def __init__(self, data, num_neighbours, batch_size, num_workers):
         super().__init__()

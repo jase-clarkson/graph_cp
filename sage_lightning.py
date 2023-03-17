@@ -15,14 +15,14 @@ from torch_geometric.datasets import Coauthor, CitationFull
 from torch_geometric.transforms import NormalizeFeatures, RandomNodeSplit
 
 from torch_geometric.nn import GraphSAGE
-from inductive_datamodule import InductiveNodeLoader
+from inductive_datamodule import InductiveNodeLoader, MultiGraphNodeLoader
 import pickle as pkl
 
 
 class Model(pl.LightningModule):
     def __init__(self, in_channels: int, out_channels: int,
                  hidden_channels: int = 64, num_layers: int = 2,
-                 dropout: float = 0.5, aggr='mean'):
+                 dropout: float = 0.2, aggr='mean'):
         super().__init__()
         self.save_hyperparameters()
         self.gnn = GraphSAGE(in_channels, hidden_channels, num_layers,
@@ -71,36 +71,53 @@ class Model(pl.LightningModule):
 def main():
     seed_everything(42)
 
-    dataset = 'Computers'
+    dataset = 'SBM'
     time = datetime.now().strftime('%d-%m-%Y_%H-%M-%S')
     fstr = time + '_' + dataset
     exp_path = os.path.join('experiments', fstr)
     os.mkdir(exp_path)
 
     data_path = os.path.join('data', dataset)
-    if dataset == 'Physics':
-        dataset = Coauthor('data/', 'CS',
-                        pre_transform=RandomNodeSplit(split='train_rest', num_val=1000, num_test=15000),
-                        transform=NormalizeFeatures())
-    elif dataset == 'DBLP':
-        dataset = CitationFull('data/', 'DBLP' ,
-                               pre_transform=RandomNodeSplit(split='train_rest', num_val=1000, num_test=12000))
+    if dataset != 'SBM':
+        if dataset == 'Physics':
+            dataset = Coauthor('data/', 'CS',
+                            pre_transform=RandomNodeSplit(split='train_rest', num_val=1000, num_test=15000),
+                            transform=NormalizeFeatures())
+        elif dataset == 'DBLP':
+            dataset = CitationFull('data/', 'DBLP' ,
+                                   pre_transform=RandomNodeSplit(split='train_rest', num_val=1000, num_test=12000))
 
-    elif dataset == 'Computers':
-        dataset = Amazon('data/', 'Computers',
-                         pre_transform=RandomNodeSplit(split='train_rest', num_val=1000, num_test=12000))
+        elif dataset == 'Computers':
+            dataset = Amazon('data/', 'Computers',
+                             pre_transform=RandomNodeSplit(split='train_rest', num_val=1000, num_test=12000))
+        else:
+            dataset = eval(dataset)(data_path)
+        # dataset = Reddit2('data/Reddit2')
+        data = dataset[0]
+        datamodule = InductiveNodeLoader(data,
+                                       num_neighbours=[25, 10],
+                                       batch_size=512,
+                                       num_workers=8)
+
+        model = Model(dataset.num_node_features,
+                      dataset.num_classes,
+                      aggr='mean')
     else:
-        dataset = eval(dataset)(data_path)
-    # dataset = Reddit2('data/Reddit2')
-    data = dataset[0]
-    datamodule = InductiveNodeLoader(data,
-                                   num_neighbours=[25, 10],
-                                   batch_size=512,
-                                   num_workers=8)
+        with open('data/SBM/train.pkl', 'rb') as f:
+            train_data = pkl.load(f)
+        with open('data/SBM/val.pkl', 'rb') as f:
+            val_data = pkl.load(f)
+        with open('data/SBM/test.pkl', 'rb') as f:
+            test_data = pkl.load(f)
 
-    model = Model(dataset.num_node_features,
-                  dataset.num_classes,
-                  aggr='mean')
+        datamodule = MultiGraphNodeLoader(train_data, val_data, test_data,
+                                          num_neighbours=[25, 10],
+                                          batch_size=512,
+                                          num_workers=8)
+        num_classes = train_data.num_classes
+        num_feat = train_data.num_node_features
+        model = Model(num_feat, num_classes, aggr='max')
+
 
     devices = torch.cuda.device_count()
     checkpoint = pl.callbacks.ModelCheckpoint(dirpath=exp_path,
@@ -111,7 +128,7 @@ def main():
     trainer = pl.Trainer(default_root_dir=exp_path,
                          accelerator='gpu',
                          devices=devices,
-                         max_epochs=30,
+                         max_epochs=15,
                          callbacks=[checkpoint])
 
     trainer.fit(model, datamodule)

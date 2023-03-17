@@ -8,7 +8,12 @@ from coverage import wsc_unbiased
 def get_weighted_quantile(scores, weights, alpha):
     wtildes = weights / (weights.sum() + 1)
     def critical_point_quantile(q): return (wtildes * (scores <= q)).sum() - (1 - alpha)
-    q = brentq(critical_point_quantile, -100, 100)
+    try:
+        q = brentq(critical_point_quantile, -1000, 1000)
+    except ValueError:
+        print(critical_point_quantile(-1000), critical_point_quantile(1000))
+        print(scores)
+        q = 0
     return q
 
 
@@ -60,15 +65,15 @@ def get_ssvc(sets, y, alpha, bins=[-1] + [i for i in range(1, 3)] + [9]):
     return max(np.abs(np.array(l_cc) - (1 - alpha)))
 
 
-def evaluate_predictions(S, X, y, alpha, display=False):
+def evaluate_predictions(S, X, y, alpha, bins, display=False):
     marg_coverage = np.mean([y[i] in S[i] for i in range(len(y))])
-    sscv = get_ssvc(S, y, alpha)
+    sscv = get_ssvc(S, y, alpha, bins)
     length = np.mean([len(S[i]) for i in range(len(y))])
     idx_cover = np.where([y[i] in S[i] for i in range(len(y))])[0]
     length_cover = np.mean([len(S[i]) for i in idx_cover])
     if display:
         print('Marginal coverage:       {:2.3%}'.format(marg_coverage))
-        # print('WS conditional coverage: {:2.3%}'.format(wsc_coverage))
         print('Average size:            {:2.3f}'.format(length))
         print('Average size | coverage: {:2.3f}'.format(length_cover))
+        print('SSCV: {:2.3%}'.format(sscv))
     return marg_coverage, length, length_cover, sscv
